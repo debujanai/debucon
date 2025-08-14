@@ -290,7 +290,7 @@ export async function POST(request: NextRequest) {
     const newFilename = `${nameWithoutExt}.${actualFormat}`
 
     // Return converted image with optimized headers
-    return new Response(convertedBuffer, {
+    return new Response(new Uint8Array(convertedBuffer), {
       headers: {
         'Content-Type': `image/${actualFormat === 'jpg' ? 'jpeg' : actualFormat}`,
         'Content-Disposition': `attachment; filename="${newFilename}"`,

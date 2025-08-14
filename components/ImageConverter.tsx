@@ -19,7 +19,7 @@ interface FileProcessingState {
   status: 'pending' | 'converting' | 'completed' | 'error'
   result?: ConversionResult
   error?: string
-  progress?: number
+  progress: number // Change this to required and always track progress
 }
 
 interface ImageConverterProps {
@@ -37,6 +37,7 @@ interface ImageConverterProps {
 const SUPPORTED_FORMATS = [
   { value: 'png', label: 'PNG', description: 'Lossless compression' },
   { value: 'jpeg', label: 'JPEG', description: 'High compression' },
+  { value: 'jpg', label: 'JPG', description: 'High compression' },
   { value: 'webp', label: 'WebP', description: 'Modern format' },
   { value: 'heic', label: 'HEIC', description: 'Apple format' },
   { value: 'heif', label: 'HEIF', description: 'High efficiency' },
@@ -68,7 +69,8 @@ export default function ImageConverter({ isDarkMode, colors }: ImageConverterPro
     // Initialize file states
     const newStates = imageFiles.map(file => ({
       file,
-      status: 'pending' as const
+      status: 'pending' as const,
+      progress: 0
     }))
     setFileStates(prev => [...prev, ...newStates])
   }, [])
@@ -92,31 +94,55 @@ export default function ImageConverter({ isDarkMode, colors }: ImageConverterPro
     setFileStates([])
   }
 
-  // Optimized parallel conversion function
-  const convertSingleImage = async (fileState: FileProcessingState): Promise<ConversionResult> => {
-    const formData = new FormData()
-    formData.append('file', fileState.file)
-    formData.append('format', targetFormat)
-    formData.append('quality', quality.toString())
+  // Optimized parallel conversion function with progress simulation
+  const convertSingleImage = async (fileState: FileProcessingState, globalIndex: number): Promise<ConversionResult> => {
+    // Start progress simulation
+    const progressInterval = setInterval(() => {
+      setFileStates(prev => prev.map((state, index) => {
+        if (index === globalIndex && state.status === 'converting') {
+          const newProgress = Math.min(state.progress + Math.random() * 15 + 5, 95)
+          return { ...state, progress: newProgress }
+        }
+        return state
+      }))
+    }, 200)
 
-    const response = await fetch('/api/convert', {
-      method: 'POST',
-      body: formData,
-    })
+    try {
+      const formData = new FormData()
+      formData.append('file', fileState.file)
+      formData.append('format', targetFormat)
+      formData.append('quality', quality.toString())
 
-    if (!response.ok) {
-      throw new Error(`Failed to convert ${fileState.file.name}`)
-    }
+      const response = await fetch('/api/convert', {
+        method: 'POST',
+        body: formData,
+      })
 
-    const blob = await response.blob()
-    const downloadUrl = URL.createObjectURL(blob)
-    
-    return {
-      originalName: fileState.file.name,
-      convertedName: `${fileState.file.name.split('.')[0]}.${targetFormat}`,
-      downloadUrl,
-      size: `${(blob.size / 1024).toFixed(1)} KB`,
-      blob: blob
+      if (!response.ok) {
+        throw new Error(`Failed to convert ${fileState.file.name}`)
+      }
+
+      const blob = await response.blob()
+      const downloadUrl = URL.createObjectURL(blob)
+      
+      // Clear progress interval and set to 100%
+      clearInterval(progressInterval)
+      setFileStates(prev => prev.map((state, index) => 
+        index === globalIndex 
+          ? { ...state, progress: 100 }
+          : state
+      ))
+      
+      return {
+        originalName: fileState.file.name,
+        convertedName: `${fileState.file.name.split('.')[0]}.${targetFormat}`,
+        downloadUrl,
+        size: `${(blob.size / 1024).toFixed(1)} KB`,
+        blob: blob
+      }
+    } catch (error) {
+      clearInterval(progressInterval)
+      throw error
     }
   }
 
@@ -127,7 +153,13 @@ export default function ImageConverter({ isDarkMode, colors }: ImageConverterPro
     setConversionResults([])
     
     // Reset all file states to pending
-    setFileStates(prev => prev.map(state => ({ ...state, status: 'pending' as const, result: undefined, error: undefined })))
+    setFileStates(prev => prev.map(state => ({ 
+      ...state, 
+      status: 'pending' as const, 
+      result: undefined, 
+      error: undefined,
+      progress: 0
+    })))
     
     try {
       // Process files in chunks to limit concurrent requests
@@ -143,7 +175,7 @@ export default function ImageConverter({ isDarkMode, colors }: ImageConverterPro
         const chunkIndices = chunk.map(state => fileStates.indexOf(state))
         setFileStates(prev => prev.map((state, index) => 
           chunkIndices.includes(index) 
-            ? { ...state, status: 'converting' as const }
+            ? { ...state, status: 'converting' as const, progress: 0 }
             : state
         ))
 
@@ -151,12 +183,12 @@ export default function ImageConverter({ isDarkMode, colors }: ImageConverterPro
         const chunkPromises = chunk.map(async (fileState, chunkIndex) => {
           const globalIndex = fileStates.indexOf(fileState)
           try {
-            const result = await convertSingleImage(fileState)
+            const result = await convertSingleImage(fileState, globalIndex)
             
             // Update individual file state to completed
             setFileStates(prev => prev.map((state, index) => 
               index === globalIndex 
-                ? { ...state, status: 'completed' as const, result }
+                ? { ...state, status: 'completed' as const, result, progress: 100 }
                 : state
             ))
             
@@ -165,7 +197,7 @@ export default function ImageConverter({ isDarkMode, colors }: ImageConverterPro
             // Update individual file state to error
             setFileStates(prev => prev.map((state, index) => 
               index === globalIndex 
-                ? { ...state, status: 'error' as const, error: error instanceof Error ? error.message : 'Unknown error' }
+                ? { ...state, status: 'error' as const, error: error instanceof Error ? error.message : 'Unknown error', progress: 0 }
                 : state
             ))
             return null
@@ -228,6 +260,29 @@ export default function ImageConverter({ isDarkMode, colors }: ImageConverterPro
       default:
         return { icon: Clock, color: colors.textMuted, bgColor: colors.cardBg }
     }
+  }
+
+  // Progress bar component
+  const ProgressBar = ({ progress, status }: { progress: number, status: string }) => {
+    if (status !== 'converting') return null
+    
+    return (
+      <div className="mt-3 w-full">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-medium text-blue-600">Converting...</span>
+          <span className="text-xs font-medium text-blue-600">{Math.round(progress)}%</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+          <div 
+            className="h-2 rounded-full transition-all duration-300 ease-out bg-gradient-to-r from-blue-500 to-blue-600"
+            style={{ 
+              width: `${progress}%`,
+              boxShadow: progress > 0 ? '0 0 10px rgba(59, 130, 246, 0.5)' : 'none'
+            }}
+          />
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -363,7 +418,7 @@ export default function ImageConverter({ isDarkMode, colors }: ImageConverterPro
                 Drag & drop images here, or <span className="text-blue-600">click to select</span>
               </p>
               <p className="text-lg font-medium" style={{ color: colors.textMuted, fontFamily: 'Inter, sans-serif' }}>
-                Supports PNG, JPEG, WebP, HEIC, HEIF, GIF, PSD, TIFF, BMP, ICO, AVIF, and RAW formats
+                Supports PNG, JPEG, JPG, WebP, HEIC, HEIF, GIF, PSD, TIFF, BMP, ICO, AVIF, and RAW formats
               </p>
             </div>
           )}
@@ -399,7 +454,7 @@ export default function ImageConverter({ isDarkMode, colors }: ImageConverterPro
                 return (
                   <div 
                     key={index} 
-                    className="flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-300"
+                    className="p-4 rounded-xl border-2 transition-all duration-300"
                     style={{
                       backgroundColor: statusDisplay.bgColor,
                       borderColor: fileState.status === 'completed' ? '#059669' : 
@@ -407,58 +462,63 @@ export default function ImageConverter({ isDarkMode, colors }: ImageConverterPro
                                  fileState.status === 'converting' ? '#3b82f6' : colors.cardBorder,
                     }}
                   >
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center">
-                        <StatusIcon 
-                          className={`w-6 h-6 ${statusDisplay.animate ? 'animate-spin' : ''}`}
-                          style={{ color: statusDisplay.color }}
-                        />
-                      </div>
-                      <div>
-                        <p className="font-bold text-lg" style={{ color: colors.text, fontFamily: 'Poppins, sans-serif' }}>
-                          {fileState.file.name}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium" style={{ color: colors.textMuted, fontFamily: 'Inter, sans-serif' }}>
-                            {(fileState.file.size / 1024).toFixed(1)} KB
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex items-center">
+                          <StatusIcon 
+                            className={`w-6 h-6 ${statusDisplay.animate ? 'animate-spin' : ''}`}
+                            style={{ color: statusDisplay.color }}
+                          />
+                        </div>
+                        <div>
+                          <p className="font-bold text-lg" style={{ color: colors.text, fontFamily: 'Poppins, sans-serif' }}>
+                            {fileState.file.name}
                           </p>
-                          {fileState.status === 'converting' && (
-                            <span className="text-blue-600 font-medium animate-pulse">Converting...</span>
-                          )}
-                          {fileState.status === 'completed' && fileState.result && (
-                            <span className="text-green-600 font-medium">→ {fileState.result.size}</span>
-                          )}
-                          {fileState.status === 'error' && (
-                            <span className="text-red-600 font-medium text-sm">{fileState.error}</span>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium" style={{ color: colors.textMuted, fontFamily: 'Inter, sans-serif' }}>
+                              {(fileState.file.size / 1024).toFixed(1)} KB
+                            </p>
+                            {fileState.status === 'converting' && (
+                              <span className="text-blue-600 font-medium animate-pulse">Converting...</span>
+                            )}
+                            {fileState.status === 'completed' && fileState.result && (
+                              <span className="text-green-600 font-medium">→ {fileState.result.size}</span>
+                            )}
+                            {fileState.status === 'error' && (
+                              <span className="text-red-600 font-medium text-sm">{fileState.error}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
+                      <div className="flex items-center gap-2">
+                        {fileState.status === 'completed' && fileState.result && (
+                          <button
+                            onClick={() => downloadFile(fileState.result!)}
+                            className="flex items-center gap-1 px-3 py-1 rounded-lg font-bold transition-all duration-300 text-sm"
+                            style={{
+                              backgroundColor: '#334155',
+                              color: 'white',
+                              fontFamily: 'Poppins, sans-serif'
+                            }}
+                          >
+                            <Download className="w-4 h-4" />
+                            Download
+                          </button>
+                        )}
+                        {!isConverting && (
+                          <button
+                            onClick={() => removeFile(index)}
+                            className="p-2 rounded-lg transition-all duration-300 hover:bg-red-100 hover:text-red-600"
+                            style={{ color: colors.textMuted }}
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {fileState.status === 'completed' && fileState.result && (
-                        <button
-                          onClick={() => downloadFile(fileState.result!)}
-                          className="flex items-center gap-1 px-3 py-1 rounded-lg font-bold transition-all duration-300 text-sm"
-                          style={{
-                            backgroundColor: '#334155',
-                            color: 'white',
-                            fontFamily: 'Poppins, sans-serif'
-                          }}
-                        >
-                          <Download className="w-4 h-4" />
-                          Download
-                        </button>
-                      )}
-                      {!isConverting && (
-                        <button
-                          onClick={() => removeFile(index)}
-                          className="p-2 rounded-lg transition-all duration-300 hover:bg-red-100 hover:text-red-600"
-                          style={{ color: colors.textMuted }}
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      )}
-                    </div>
+                    
+                    {/* Progress Bar */}
+                    <ProgressBar progress={fileState.progress} status={fileState.status} />
                   </div>
                 )
               })}
@@ -510,27 +570,21 @@ export default function ImageConverter({ isDarkMode, colors }: ImageConverterPro
         >
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-3xl font-black" style={{ fontFamily: 'Poppins, sans-serif', color: colors.text }}>
-              Conversion Results ({conversionResults.length})
+              Conversion Results
             </h3>
             {conversionResults.length > 1 && (
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium" style={{ color: colors.textMuted, fontFamily: 'Inter, sans-serif' }}>
-                  {conversionResults.length} files ready
-                </span>
-                <button
-                  onClick={downloadAll}
-                  className="flex items-center gap-2 px-8 py-4 rounded-xl font-bold transition-all duration-300 hover:-translate-y-1 hover:shadow-xl border-2 border-transparent hover:border-green-400"
-                  style={{
-                    backgroundColor: '#059669',
-                    color: 'white',
-                    fontFamily: 'Poppins, sans-serif',
-                    boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
-                  }}
-                >
-                  <Archive className="w-5 h-5" />
-                  Download All ZIP
-                </button>
-              </div>
+              <button
+                onClick={downloadAll}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+                style={{
+                  backgroundColor: '#059669',
+                  color: 'white',
+                  fontFamily: 'Poppins, sans-serif'
+                }}
+              >
+                <Archive className="w-5 h-5" />
+                Download All as ZIP
+              </button>
             )}
           </div>
           

@@ -60,90 +60,14 @@ export async function POST(request: NextRequest) {
     // Convert image based on target format with optimizations
     switch (targetFormat.toLowerCase()) {
       case 'png':
-        // Advanced PNG optimization based on image characteristics
-        const hasAlpha = metadata.channels === 4 || metadata.hasAlpha
-        const colors = metadata.density || 0
-        
-        // For high-quality settings (>90), use lossless optimization
-        if (quality > 90) {
-          convertedBuffer = await sharpInstance
-            .resize(resizeOptions)
-            .png({ 
-              compressionLevel: 9, // Maximum compression for lossless
-              adaptiveFiltering: true, // Better compression at slight speed cost
-              palette: !hasAlpha && colors < 256, // Use palette for images with few colors
-              quality: 100, // Lossless
-              effort: 10, // Maximum effort for best compression
-              colours: Math.min(colors || 256, 256), // Optimize color count
-              dither: 0.0, // No dithering for high quality
-              force: true
-            })
-            .toBuffer()
-        } 
-        // For medium quality (70-90), use optimized lossless with palette reduction
-        else if (quality >= 70) {
-          // Try to convert to palette if possible for better compression
-          const tempBuffer = await sharpInstance
-            .resize(resizeOptions)
-            .png({ 
-              compressionLevel: 9,
-              adaptiveFiltering: true,
-              palette: true, // Force palette mode if possible
-              quality: 100, // Lossless but with palette optimization
-              effort: 10,
-              colours: Math.min(Math.ceil(quality * 2.56), 256), // Reduce colors based on quality
-              dither: (100 - quality) / 200, // Light dithering for smooth gradients
-              force: true
-            })
-            .toBuffer()
-          
-          // If palette conversion fails or results in larger file, use regular compression
-          try {
-            convertedBuffer = tempBuffer
-          } catch (error) {
-            convertedBuffer = await sharpInstance
-              .resize(resizeOptions)
-              .png({ 
-                compressionLevel: 9,
-                adaptiveFiltering: true,
-                quality: quality,
-                effort: 8,
-                force: true
-              })
-              .toBuffer()
-          }
-        }
-        // For lower quality settings (<70), use aggressive optimization
-        else {
-          // First pass: Try quantization for smaller files
-          try {
-            convertedBuffer = await sharpInstance
-              .resize(resizeOptions)
-              .png({ 
-                compressionLevel: 9,
-                adaptiveFiltering: true,
-                palette: true, // Force palette for better compression
-                quality: Math.max(quality, 40), // Don't go below 40 for PNG
-                effort: 10,
-                colours: Math.max(Math.ceil(quality * 2.56), 16), // Reduce colors aggressively
-                dither: Math.min((100 - quality) / 100, 0.8), // More dithering for lower quality
-                force: true
-              })
-              .toBuffer()
-          } catch (error) {
-            // Fallback to standard PNG compression
-            convertedBuffer = await sharpInstance
-              .resize(resizeOptions)
-              .png({ 
-                compressionLevel: 9,
-                adaptiveFiltering: true,
-                quality: quality,
-                effort: 6,
-                force: true
-              })
-              .toBuffer()
-          }
-        }
+        convertedBuffer = await sharpInstance
+          .resize(resizeOptions)
+          .png({ 
+            compressionLevel: 6, // Good balance of speed vs compression
+            adaptiveFiltering: false, // Faster processing
+            force: true
+          })
+          .toBuffer()
         break
       case 'jpeg':
       case 'jpg':
@@ -153,23 +77,18 @@ export async function POST(request: NextRequest) {
             quality: Math.max(1, Math.min(100, quality)),
             progressive: true,
             mozjpeg: true, // Better compression
-            optimizeScans: true, // Optimize scan order
-            trellisQuantisation: true, // Better quality at low bitrates
-            overshootDeringing: true, // Reduce artifacts
             force: true
           })
           .toBuffer()
+        // Keep the original format choice (jpeg or jpg) for filename
+        actualFormat = targetFormat
         break
       case 'webp':
         convertedBuffer = await sharpInstance
           .resize(resizeOptions)
           .webp({ 
             quality: Math.max(1, Math.min(100, quality)),
-            effort: 6, // Higher effort for better compression
-            alphaQuality: Math.max(1, Math.min(100, quality)), // Preserve alpha quality
-            lossless: quality >= 95, // Use lossless for very high quality
-            nearLossless: quality >= 90 && quality < 95, // Near-lossless for high quality
-            smartSubsample: true, // Better compression for certain images
+            effort: 4, // Good balance of speed vs compression (0-6)
             force: true
           })
           .toBuffer()
@@ -179,9 +98,7 @@ export async function POST(request: NextRequest) {
           .resize(resizeOptions)
           .avif({ 
             quality: Math.max(1, Math.min(100, quality)),
-            effort: 6, // Good balance of speed vs compression
-            chromaSubsampling: quality < 80 ? '4:2:0' : '4:4:4', // Better quality for high settings
-            lossless: quality >= 98, // Lossless only for near-perfect quality
+            effort: 4, // Faster than default (0-9)
             force: true
           })
           .toBuffer()
@@ -192,8 +109,7 @@ export async function POST(request: NextRequest) {
           .resize(resizeOptions)
           .tiff({ 
             quality: Math.max(1, Math.min(100, quality)),
-            compression: quality >= 80 ? 'lzw' : 'jpeg', // Use JPEG compression for smaller files
-            predictor: 'horizontal', // Better compression for continuous-tone images
+            compression: 'lzw',
             xres: 300,
             yres: 300,
             force: true
@@ -201,31 +117,22 @@ export async function POST(request: NextRequest) {
           .toBuffer()
         break
       case 'bmp':
-        // Convert to optimized PNG since Sharp doesn't support BMP output directly
+        // Convert to PNG since Sharp doesn't support BMP output directly
         convertedBuffer = await sharpInstance
           .resize(resizeOptions)
           .png({ 
-            compressionLevel: 9,
-            adaptiveFiltering: true,
-            palette: true, // Use palette for better compression
-            quality: Math.max(quality, 80), // Maintain quality for BMP conversion
-            effort: 8,
+            compressionLevel: 6,
             force: true
           })
           .toBuffer()
         actualFormat = 'png' // Update format since we're actually outputting PNG
         break
       case 'gif':
-        // Convert to optimized PNG with palette for GIF-like images
+        // Sharp has limited GIF support, convert to PNG for better results
         convertedBuffer = await sharpInstance
           .resize(resizeOptions)
           .png({
-            compressionLevel: 9,
-            adaptiveFiltering: true,
-            palette: true, // Force palette for GIF-style images
-            colours: Math.min(256, Math.max(16, quality * 2.56)), // Limit colors like GIF
-            dither: 0.5, // Add dithering for smooth gradients
-            effort: 10,
+            compressionLevel: 6,
             force: true
           })
           .toBuffer()
@@ -238,42 +145,30 @@ export async function POST(request: NextRequest) {
           .heif({ 
             quality: Math.max(1, Math.min(100, quality)),
             compression: 'hevc',
-            effort: 6, // Balance speed and compression
-            chromaSubsampling: quality < 80 ? '4:2:0' : '4:4:4',
             force: true
           })
           .toBuffer()
         break
       case 'psd':
-        // Convert PSD to optimized PNG since Sharp can read PSD but not write it
+        // Convert PSD to PNG since Sharp can read PSD but not write it
         convertedBuffer = await sharpInstance
           .resize(resizeOptions)
           .png({
-            compressionLevel: 9,
-            adaptiveFiltering: true,
-            quality: Math.max(quality, 85), // Maintain quality for PSD conversion
-            effort: 8,
+            compressionLevel: 6,
             force: true
           })
           .toBuffer()
         actualFormat = 'png' // Update format since we're actually outputting PNG
         break
       case 'ico':
-        // Convert to optimized PNG for ICO format
+        // Convert to PNG first, then resize for ICO (multiple sizes would be ideal)
         convertedBuffer = await sharpInstance
           .resize(256, 256, { 
             fit: 'contain', 
             background: { r: 0, g: 0, b: 0, alpha: 0 },
             withoutEnlargement: false
           })
-          .png({ 
-            compressionLevel: 9,
-            adaptiveFiltering: true,
-            palette: true, // Use palette for icon-style images
-            quality: Math.max(quality, 90), // High quality for icons
-            effort: 10,
-            force: true 
-          })
+          .png({ force: true })
           .toBuffer()
         actualFormat = 'png' // Update format since we're actually outputting PNG
         break
@@ -292,7 +187,7 @@ export async function POST(request: NextRequest) {
     // Return converted image with optimized headers
     return new Response(new Uint8Array(convertedBuffer), {
       headers: {
-        'Content-Type': `image/${actualFormat === 'jpg' ? 'jpeg' : actualFormat}`,
+        'Content-Type': `image/${(actualFormat === 'jpg' || actualFormat === 'jpeg') ? 'jpeg' : actualFormat}`,
         'Content-Disposition': `attachment; filename="${newFilename}"`,
         'Content-Length': convertedBuffer.length.toString(),
         'Cache-Control': 'no-cache, no-store, must-revalidate', // Prevent caching of converted images

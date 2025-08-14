@@ -115,7 +115,7 @@ export default function Home() {
               {[
                 { name: 'PNG', desc: 'Lossless compression', emoji: '🖼️' },
                 { name: 'JPEG', desc: 'High compression', emoji: '📷' },
-                { name: 'JPG', desc: 'High compression', emoji: '📷' },
+                { name: 'JPG', desc: 'High compression', emoji: '📱' },
                 { name: 'WebP', desc: 'Modern format', emoji: '🌐' },
                 { name: 'HEIC', desc: 'Apple format', emoji: '🍎' },
                 { name: 'HEIF', desc: 'High efficiency', emoji: '⚡' },

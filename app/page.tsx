@@ -46,6 +46,7 @@ export default function Home() {
   }
 
   const colors = getThemeColors()
+  const [activeTool, setActiveTool] = useState<'image' | 'audio'>('image')
 
   return (
     <>
@@ -102,15 +103,50 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Image Converter Component */
-          }
-          <div className="opacity-0 animate-[fadeInUp_1s_ease_0.4s_forwards]">
-            <ImageConverter isDarkMode={isDarkMode} colors={colors} />
+          {/* Tool Switcher */}
+          <div className="mt-6 mb-8 flex items-center justify-center opacity-0 animate-[fadeInUp_1s_ease_0.45s_forwards]">
+            <div
+              className="relative inline-flex p-1 rounded-2xl border-2"
+              style={{ backgroundColor: colors.cardBg, borderColor: colors.cardBorder }}
+              role="tablist"
+              aria-label="Converter switch"
+            >
+              <button
+                onClick={() => setActiveTool('image')}
+                className={`px-5 py-2 rounded-xl font-bold transition-all duration-300 ${activeTool === 'image' ? 'shadow' : ''}`}
+                style={{
+                  backgroundColor: activeTool === 'image' ? (isDarkMode ? '#1f2937' : '#e5e7eb') : 'transparent',
+                  color: colors.text,
+                  fontFamily: 'Poppins, sans-serif'
+                }}
+                role="tab"
+                aria-selected={activeTool === 'image'}
+              >
+                Image
+              </button>
+              <button
+                onClick={() => setActiveTool('audio')}
+                className={`px-5 py-2 rounded-xl font-bold transition-all duration-300 ${activeTool === 'audio' ? 'shadow' : ''}`}
+                style={{
+                  backgroundColor: activeTool === 'audio' ? (isDarkMode ? '#1f2937' : '#e5e7eb') : 'transparent',
+                  color: colors.text,
+                  fontFamily: 'Poppins, sans-serif'
+                }}
+                role="tab"
+                aria-selected={activeTool === 'audio'}
+              >
+                Audio
+              </button>
+            </div>
           </div>
 
-          {/* Audio Converter Component */}
-          <div className="opacity-0 animate-[fadeInUp_1s_ease_0.5s_forwards] mt-16">
-            <AudioConverter isDarkMode={isDarkMode} colors={colors} />
+          {/* Active Converter */}
+          <div className="opacity-0 animate-[fadeInUp_1s_ease_0.5s_forwards]">
+            {activeTool === 'image' ? (
+              <ImageConverter isDarkMode={isDarkMode} colors={colors} />
+            ) : (
+              <AudioConverter isDarkMode={isDarkMode} colors={colors} />
+            )}
           </div>
 
           {/* Supported Formats Grid */}

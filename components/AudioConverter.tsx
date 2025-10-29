@@ -335,7 +335,6 @@ export default function AudioConverter({ isDarkMode, colors }: AudioConverterPro
           {...getRootProps()}
           className={`border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 ${isDragActive ? 'scale-105' : 'hover:scale-102'}`}
           style={{ backgroundColor: isDragActive ? (isDarkMode ? '#1e293b' : '#f1f5f9') : colors.cardBg, borderColor: isDragActive ? '#334155' : colors.cardBorder }}
-          onClick={async () => { if (!ffmpegReady) await ensureFFmpeg() }}
         >
           <input {...getInputProps()} />
           <div className="text-6xl mb-6 transition-all duration-300">🎵</div>

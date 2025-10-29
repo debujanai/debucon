@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import ImageConverter from '@/components/ImageConverter'
+import AudioConverter from '@/components/AudioConverter'
 import { Moon, Sun } from 'lucide-react'
 
 export default function Home() {
@@ -101,9 +102,15 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Image Converter Component */}
+          {/* Image Converter Component */
+          }
           <div className="opacity-0 animate-[fadeInUp_1s_ease_0.4s_forwards]">
             <ImageConverter isDarkMode={isDarkMode} colors={colors} />
+          </div>
+
+          {/* Audio Converter Component */}
+          <div className="opacity-0 animate-[fadeInUp_1s_ease_0.5s_forwards] mt-16">
+            <AudioConverter isDarkMode={isDarkMode} colors={colors} />
           </div>
 
           {/* Supported Formats Grid */}

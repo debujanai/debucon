@@ -152,23 +152,35 @@ export default function Home() {
           {/* Supported Formats Grid */}
           <div className="mt-16 text-center opacity-0 animate-[fadeInUp_1s_ease_0.6s_forwards]">
             <h2 className="text-3xl font-black mb-8" style={{ fontFamily: 'Poppins, sans-serif', color: colors.text }}>
-              Supported Formats
+              Supported Formats {activeTool === 'image' ? '(Image)' : '(Audio)'}
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-              {[
-                { name: 'PNG', desc: 'Lossless compression', emoji: '🖼️' },
-                { name: 'JPEG', desc: 'High compression', emoji: '📷' },
-                { name: 'JPG', desc: 'High compression', emoji: '📱' },
-                { name: 'WebP', desc: 'Modern format', emoji: '🌐' },
-                { name: 'HEIC', desc: 'Apple format', emoji: '🍎' },
-                { name: 'HEIF', desc: 'High efficiency', emoji: '⚡' },
-                { name: 'GIF', desc: 'Animated images', emoji: '🎬' },
-                { name: 'PSD', desc: 'Photoshop files', emoji: '🎨' },
-                { name: 'TIFF', desc: 'High quality', emoji: '📸' },
-                { name: 'BMP', desc: 'Bitmap format', emoji: '🖼️' },
-                { name: 'ICO', desc: 'Icon format', emoji: '🔲' },
-                { name: 'AVIF', desc: 'Next-gen format', emoji: '🚀' }
-              ].map((format, index) => (
+              {(activeTool === 'image'
+                ? [
+                    { name: 'PNG', desc: 'Lossless compression', emoji: '🖼️' },
+                    { name: 'JPEG', desc: 'High compression', emoji: '📷' },
+                    { name: 'JPG', desc: 'High compression', emoji: '📱' },
+                    { name: 'WebP', desc: 'Modern format', emoji: '🌐' },
+                    { name: 'HEIC', desc: 'Apple format', emoji: '🍎' },
+                    { name: 'HEIF', desc: 'High efficiency', emoji: '⚡' },
+                    { name: 'GIF', desc: 'Animated images', emoji: '🎬' },
+                    { name: 'PSD', desc: 'Photoshop files', emoji: '🎨' },
+                    { name: 'TIFF', desc: 'High quality', emoji: '📸' },
+                    { name: 'BMP', desc: 'Bitmap format', emoji: '🖼️' },
+                    { name: 'ICO', desc: 'Icon format', emoji: '🔲' },
+                    { name: 'AVIF', desc: 'Next-gen format', emoji: '🚀' }
+                  ]
+                : [
+                    { name: 'MP3', desc: 'Popular, lossy', emoji: '🎧' },
+                    { name: 'WAV', desc: 'Uncompressed PCM', emoji: '📼' },
+                    { name: 'OGG/Opus', desc: 'Modern, efficient', emoji: '🌀' },
+                    { name: 'FLAC', desc: 'Lossless compression', emoji: '💽' },
+                    { name: 'M4A/AAC', desc: 'Widely supported', emoji: '📱' },
+                    { name: 'WEBM/Opus', desc: 'Web-friendly', emoji: '🌐' },
+                    { name: 'AIFF', desc: 'Uncompressed', emoji: '🎛️' },
+                    { name: 'AAC', desc: 'Lossy codec', emoji: '🎵' }
+                  ]
+              ).map((format, index) => (
                 <div 
                   key={format.name} 
                   className="border-2 rounded-xl p-4 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
